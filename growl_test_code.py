@@ -48,10 +48,10 @@ parser = argparse.ArgumentParser(description='To perform tests with GROWL, decid
 parser.add_argument('-f', '--feats', default=20, help='Sets the number of features to create an embedding for'
                     , type=int)
 parser.add_argument('-e', '--epochs', default=100, help='Sets the numebr of epochs to train GROWL for.', type=int)
-parser.add_argument('-s', '--string_end', default='20220117', help='The postfix of the results filename.', type=string)
-parser.add_argument('-t', '--test', help='Which dataset to test on.', type=string, default='ps',
+parser.add_argument('-s', '--string_end', default='20220117', help='The postfix of the results filename.', type=str)
+parser.add_argument('-t', '--test', help='Which dataset to test on.', type=str, default='ps',
                     choices=['ps', 'cpp', 'all_salsa', 'rica', 'rica_yolo'])
-parser.add_argument('-a', '--ablation', help='Is this a test involving ablation?', type=string,
+parser.add_argument('-a', '--ablation', help='Is this a test involving ablation?', type=str,
                     default='no', choices=['no', 'ori', 'edg'])
 parser.add_argument('-b', '--balance_samples', action='store_true', help='Enable sample balancing to discard runs'
                                                                          'if there is too big of an imbalance between'
@@ -65,7 +65,7 @@ parser.add_argument('--yolo_to_gt', action='store_true', help='When testing on Y
                                                               'to the GT detections.')
 
 args = parser.parse_args()
-logger.info('Running test with: -t="%s", -a="%s"' % (args.t, args.a))
+logger.info('Running test with: -t="%s", -a="%s"' % (args.test, args.ablation))
 
 # Point to where the SALSA cpp and ps folders are. Keep the structure SALSA provides.
 base_path_cpp = 'salsa/Annotation/salsa_cpp/'
@@ -79,7 +79,7 @@ base_path_rica = './yolo_db_orientation_20210810_cd_1.csv'
 # doesn't overwrite values for matching keys.
 extra_time = 10000
 frame_data_ps = ut.read_frame_data(base_path_ps, 0)
-if args.t == 'cpp' or args.t == 'all_salsa':
+if args.test == 'cpp' or args.test == 'all_salsa':
     frame_data_cpp = ut.read_frame_data(base_path_cpp, extra_time)
 
 salsa_ps_keys = list(frame_data_ps.keys())
@@ -89,13 +89,13 @@ train_set_keys = salsa_ps_keys[:split_idx]
 test_set_keys = salsa_ps_keys[split_idx:]
 
 train_dict = dict((k, frame_data_ps[k]) for k in train_set_keys)
-if args.t == 'ps':
+if args.test == 'ps':
     test_dict = dict((k, frame_data_ps[k]) for k in test_set_keys)
-elif args.t == 'cpp' or args.t == 'all_salsa':
+elif args.test == 'cpp' or args.test == 'all_salsa':
     remaining_dict = dict((k, frame_data_ps[k]) for k in test_set_keys)
     test_dict = {**remaining_dict, **frame_data_cpp}
     test_dict = frame_data_cpp
-if args.t in ['ps', 'cpp', 'all_salsa']:
+if args.test in ['ps', 'cpp', 'all_salsa']:
     logger.info('Train len: %d, Test len: %d' % (len(train_dict.keys()), len(test_dict.keys())))
 
 train_node_data = {}
@@ -117,7 +117,7 @@ for frame_id, frame_info in train_dict.items():
             if pos_x > max_side_dist:
                 max_side_dist = pos_x
             pos_y = float(data[1])
-            if args.a == 'no' or args.a == 'edg':
+            if args.ablation == 'no' or args.ablation == 'edg':
                 body_pose = float(data[3])
                 rel_head_pose = float(data[4])
                 head_pose = body_pose + rel_head_pose
@@ -136,7 +136,7 @@ for frame_id, frame_info in train_dict.items():
                     # src dst distance effort
                     distance = math.dist([person_data[2], person_data[3]], [node_data[idx][2], node_data[idx][3]])
 
-                    if args.a == 'no' or args.a == 'edg':
+                    if args.ablation == 'no' or args.ablation == 'edg':
                         angle_diff = person_data[-1] - (node_data[idx][-1] - math.pi)
                         if angle_diff > math.pi * 2:
                             # print('bullshit +\t', angle_diff)
@@ -157,7 +157,7 @@ for frame_id, frame_info in train_dict.items():
 
     train_edge_data[frame_id] = edge_data
 
-if 'rica' not in args.t:
+if 'rica' not in args.test:
     rica_test = False
 else:
     rica_test = True
@@ -165,13 +165,13 @@ else:
         rel_dist = 1
     else:
         rel_dist = max_side_dist / 640
-    if args.t == 'rica':
+    if args.test == 'rica':
         frame_data_rica = ut.read_rica_frdata(base_path_rica_gt, rel_dist, 0)
     else:
         frame_data_rica = ut.read_rica_frdata(base_path_rica, rel_dist, 0)
     frame_data_rica_gt = ut.read_rica_frdata(base_path_rica_gt, rel_dist, 0)
     test_dict = frame_data_rica
-    if args.t == 'rica_yolo' and args.yolo_acc:
+    if args.test == 'rica_yolo' and args.yolo_acc:
         det_accs = []
         for frame, gtbb in frame_data_rica_gt.items():
             pred_bbc = 0
@@ -196,9 +196,9 @@ for frame_id, frame_info in test_dict.items():
             if group_id == 0:
                 group_id = -1
 
-            if args.a == 'no' or args.a == 'edg':
+            if args.ablation == 'no' or args.ablation == 'edg':
                 node_data.append([person_count, group_id, round(pos_x, 2), round(pos_y, 2), round(head_pose, 4)])
-            elif args.a == 'ori':
+            elif args.ablation == 'ori':
                 node_data.append([person_count, group_id, round(pos_x, 2), round(pos_y, 2)])
 
             person_count += 1
@@ -214,7 +214,7 @@ for frame_id, frame_info in test_dict.items():
                         distance = math.dist([person_data[2], person_data[3]],
                                              [node_data[idx][2], node_data[idx][3]])
 
-                        if args.a == 'no' or args.a == 'edg':
+                        if args.ablation == 'no' or args.ablation == 'edg':
                             angle_diff = person_data[-1] - (node_data[idx][-1] - math.pi)
                             if angle_diff > math.pi * 2:
                                 # print('bullshit +\t', angle_diff)
@@ -254,7 +254,7 @@ for frame_id, frame_info in test_dict.items():
                 if pos_x > max_side_dist:
                     max_side_dist = pos_x
                 pos_y = float(data[1])
-                if args.a == 'no' or args.a == 'edg':
+                if args.ablation == 'no' or args.ablation == 'edg':
                     body_pose = float(data[3])
                     rel_head_pose = float(data[4])
                     head_pose = body_pose + rel_head_pose
@@ -272,7 +272,7 @@ for frame_id, frame_info in test_dict.items():
                     if group == node_data[idx][1]:
                         # src dst distance effort
                         distance = math.dist([person_data[2], person_data[3]], [node_data[idx][2], node_data[idx][3]])
-                        if args.a == 'no' or args.a == 'edg':
+                        if args.ablation == 'no' or args.ablation == 'edg':
                             angle_diff = person_data[-1] - (node_data[idx][-1] - math.pi)
                             if angle_diff > math.pi * 2:
                                 # print('bullshit +\t', angle_diff)
@@ -432,7 +432,7 @@ pos_edge_count = 0
 neg_edge_count = 0
 for single_train_graph in train_set:
     u, v = single_train_graph.edges()
-    if args.a == 'edg':
+    if args.ablation == 'edg':
         train_pos_u, train_pos_v = u, v
         train_pos_g = dgl.graph((train_pos_u, train_pos_v), num_nodes=single_train_graph.num_nodes())
     else:
@@ -456,7 +456,7 @@ for single_train_graph in train_set:
         # print('FEAT COUNT', len(batched_graph.ndata['feat']))
         h = model(single_train_graph, single_train_graph.ndata['feat'])
         pos_score = pred(train_pos_g, h)[0]['score']
-        if args.a == 'edg':
+        if args.ablation == 'edg':
             loss = ut.compute_loss_posonly(pos_score)
         else:
             neg_score = pred(train_neg_g, h)[0]['score']
@@ -471,7 +471,7 @@ print('- edge c', neg_edge_count)
 
 # Until a better method is found for balancing positive and negative feature data, if the sets are imbalanced,
 # discard the run.
-if args.b:
+if args.balance_samples:
     if pos_edge_count < 23400 and (neg_edge_count-pos_edge_count) > 65500:  # can be separate
         exit()
 
@@ -608,7 +608,7 @@ for single_val_idx, single_val_graph in enumerate(test_set):
             recall_scores.append(recall)
             f1_scores.append(f1)
 
-        if args.p:
+        if args.plot:
             nx_g = test_graph_out.to_networkx().to_undirected()
             try:
                 nx.draw(nx_g, pos, with_labels=True, node_color="#A0CBE2")
@@ -619,7 +619,7 @@ for single_val_idx, single_val_graph in enumerate(test_set):
 
 if len(f1_scores) > 0:
     tracker_file_path = 'growl_param_analysis/%s_ablation_%s_test_%d_feats_%d_epochs_%d_balanced_model_f1output_%s.csv' % \
-                        (args.a, args.t, args.f, args.e, int(args.b), args.s)
+                        (args.ablation, args.test, args.feats, args.epochs, int(args.balance_samples), args.string_end)
     model_output_tracker = pd.DataFrame(
         list(zip([datetime.datetime.now()], [h_feats], [epochs], [len(f1_scores)],
                  [np.mean(precision_scores)], [np.mean(recall_scores)], [np.mean(f1_scores)],
