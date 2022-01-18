@@ -1,11 +1,26 @@
-import os
+# ---------------------------------------------------------------------------
+# Created By  : Viktor Schmuck - https://github.com/d4rkspir1t
+# Created Date: 07/01/2021
+# Last revised: 17/01/2022
+# ---------------------------------------------------------------------------
+__author__ = 'Viktor Schmuck'
+__credits__ = ['Viktor Schmuck', 'Oya Celiktutan']
+__license__ = 'MIT'
+__version__ = '1.0.1'
+__maintainer__ = 'Viktor Schmuck'
+__email__ = 'viktor.schmuck@kcl.ac.uk'
+__status__ = 'Development in Progress'
+
 import csv
+import os
+
 from sklearn.metrics import roc_auc_score
+
+from dgl.nn import SAGEConv
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl.nn import SAGEConv
-
 
 person_log = 'geometryGT/'
 fformation_log = 'fformationGT.csv'
