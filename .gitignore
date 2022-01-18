@@ -1,0 +1,5 @@
+/.idea
+/salsa
+*/__pycache__
+.pyc
+.csv
