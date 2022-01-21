@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # Created By  : Viktor Schmuck - https://github.com/d4rkspir1t
 # Created Date: 07/01/2021
-# Last revised: 17/01/2022
+# Last revised: 21/01/2022
 # ---------------------------------------------------------------------------
 __author__ = 'Viktor Schmuck'
 __credits__ = ['Viktor Schmuck', 'Oya Celiktutan']
@@ -45,7 +45,7 @@ logger = logging.getLogger()
 logger.setLevel('INFO')
 parser = argparse.ArgumentParser(description='To perform tests with GROWL, decide which data to test on '
                                              'and whether this is an ablation test.')
-parser.add_argument('-f', '--feats', default=20, help='Sets the number of features to create an embedding for'
+parser.add_argument('-f', '--feats', default=20, help='Sets the number of features to create an embedding for.'
                     , type=int)
 parser.add_argument('-e', '--epochs', default=100, help='Sets the numebr of epochs to train GROWL for.', type=int)
 parser.add_argument('-s', '--string_end', default='20220117', help='The postfix of the results filename.', type=str)
@@ -53,15 +53,15 @@ parser.add_argument('-t', '--test', help='Which dataset to test on.', type=str, 
                     choices=['ps', 'cpp', 'all_salsa', 'rica', 'rica_yolo'])
 parser.add_argument('-a', '--ablation', help='Is this a test involving ablation?', type=str,
                     default='no', choices=['no', 'ori', 'edg'])
-parser.add_argument('-b', '--balance_samples', action='store_true', help='Enable sample balancing to discard runs'
-                                                                         'if there is too big of an imbalance between'
+parser.add_argument('-b', '--balance_samples', action='store_true', help='Enable sample balancing to discard runs '
+                                                                         'if there is too big of an imbalance between '
                                                                          'positive and negative edge counts.')
 parser.add_argument('-p', '--plot', action='store_true', help='Enable plotting the graphs produced during the tests.')
-parser.add_argument('--yolo_acc', action='store_true', help='Print YOLOv4 detection accuracy compared'
-                                                            'to RICA\'s ground truth. Only has an effect'
+parser.add_argument('--yolo_acc', action='store_true', help='Print YOLOv4 detection accuracy compared '
+                                                            'to RICA\'s ground truth. Only has an effect '
                                                             'if test=rica_yolo.')
 parser.add_argument('--yolo_to_gt', action='store_true', help='When testing on YOLOv4 detections, '
-                                                              'calculate F1-scores of detected groups compared'
+                                                              'calculate F1-scores of detected groups compared '
                                                               'to the GT detections.')
 
 args = parser.parse_args()
@@ -139,11 +139,9 @@ for frame_id, frame_info in train_dict.items():
                     if args.ablation == 'no' or args.ablation == 'edg':
                         angle_diff = person_data[-1] - (node_data[idx][-1] - math.pi)
                         if angle_diff > math.pi * 2:
-                            # print('bullshit +\t', angle_diff)
                             angle_diff = angle_diff % (math.pi * 2)
                             # print('\tcorrected: ', angle_diff)
                         elif angle_diff < math.pi * -2:
-                            # print('bullshit -\t', angle_diff)
                             angle_diff = angle_diff % (math.pi * 2)
                             # print('\tcorrected: ', angle_diff)
                         if angle_diff < 0:
@@ -179,7 +177,7 @@ else:
                 pred_bbc = len(frame_data_rica[frame])
             det_accs.append(pred_bbc/len(gtbb))
             # print(frame, len(gtbb), len(frame_data_rica[frame]))
-        print(np.average(det_accs))
+        logger.info(str(np.average(det_accs)))
 
 test_node_data = {}
 test_edge_data = {}
@@ -217,11 +215,9 @@ for frame_id, frame_info in test_dict.items():
                         if args.ablation == 'no' or args.ablation == 'edg':
                             angle_diff = person_data[-1] - (node_data[idx][-1] - math.pi)
                             if angle_diff > math.pi * 2:
-                                # print('bullshit +\t', angle_diff)
                                 angle_diff = angle_diff % (math.pi * 2)
                                 # print('\tcorrected: ', angle_diff)
                             elif angle_diff < math.pi * -2:
-                                # print('bullshit -\t', angle_diff)
                                 angle_diff = angle_diff % (math.pi * 2)
                                 # print('\tcorrected: ', angle_diff)
                             if angle_diff < 0:
@@ -275,11 +271,9 @@ for frame_id, frame_info in test_dict.items():
                         if args.ablation == 'no' or args.ablation == 'edg':
                             angle_diff = person_data[-1] - (node_data[idx][-1] - math.pi)
                             if angle_diff > math.pi * 2:
-                                # print('bullshit +\t', angle_diff)
                                 angle_diff = angle_diff % (math.pi * 2)
                                 # print('\tcorrected: ', angle_diff)
                             elif angle_diff < math.pi * -2:
-                                # print('bullshit -\t', angle_diff)
                                 angle_diff = angle_diff % (math.pi * 2)
                                 # print('\tcorrected: ', angle_diff)
                             if angle_diff < 0:
@@ -333,7 +327,7 @@ for frame_id, val in train_edge_data.items():
     if draw_graph:
         nx_g = graph.to_networkx().to_undirected()
         # pos = nx.kamada_kawai_layout(nx_g)
-        print(pos)
+        logger.debug(pos)
         # should assign pos on -1:1 scale based on coordinates
         try:
             nx.draw(nx_g, pos, with_labels=True, node_color="#A0CBE2")
@@ -353,7 +347,7 @@ for frame_id, val in train_edge_data.items():
         plt.savefig(graph_path)
         plt.close()
     train_graphs.append(graph)
-print('Skipped: ', skipped)
+logger.info('Skipped: %d' % skipped)
 
 skipped = 0
 iters_ps = 0
@@ -392,7 +386,7 @@ for frame_id, val in test_edge_data.items():
     if draw_graph:
         nx_g = graph.to_networkx().to_undirected()
         # pos = nx.kamada_kawai_layout(nx_g)
-        print(pos)
+        logger.debug(pos)
         # should assign pos on -1:1 scale based on coordinates
         try:
             nx.draw(nx_g, pos, with_labels=True, node_color="#A0CBE2")
@@ -413,7 +407,7 @@ for frame_id, val in test_edge_data.items():
         plt.close()
     test_graphs.append(graph)
     test_graph_frame_ids.append(frame_id)
-print('Skipped: ', skipped)
+logger.info('Skipped: %d' % skipped)
 
 count = 0
 
@@ -466,8 +460,8 @@ for single_train_graph in train_set:
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-print('+ edge c', pos_edge_count)
-print('- edge c', neg_edge_count)
+logger.info('+ edge c %d' % pos_edge_count)
+logger.info('- edge c %d' % neg_edge_count)
 
 # Until a better method is found for balancing positive and negative feature data, if the sets are imbalanced,
 # discard the run.
@@ -480,7 +474,7 @@ auc_scores = []
 precision_scores = []
 recall_scores = []
 f1_scores = []
-print('Starting tests', len(test_set))
+logger.info('Starting tests %d' % len(test_set))
 test_c = 0
 for single_val_idx, single_val_graph in enumerate(test_set):
     test_c += 1
@@ -557,7 +551,7 @@ for single_val_idx, single_val_graph in enumerate(test_set):
                     # MISSES DUE TO YOLO NOT RECOGNISING PEOPLE
                     # ==================================================================================================
                         for rgt_key, rgt_val in frame_data_rica_gt.items():
-                            print(rgt_key, len(rgt_val))
+                            logger.debug('%s - %d' % (str(rgt_key), len(rgt_val)))
                         rgt_node_count = len(frame_data_rica_gt[test_graph_frame_ids[single_val_idx]])
                         ryo_node_count = len(frame_data_rica[test_graph_frame_ids[single_val_idx]])
                         miss += rgt_node_count - ryo_node_count
