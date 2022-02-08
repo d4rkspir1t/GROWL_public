@@ -53,9 +53,9 @@ parser.add_argument('-t', '--test', help='Which dataset to test on.', type=str, 
                     choices=['ps', 'cpp', 'all_salsa', 'rica', 'rica_yolo'])
 parser.add_argument('-a', '--ablation', help='Is this a test involving ablation?', type=str,
                     default='no', choices=['no', 'ori', 'edg'])
-parser.add_argument('-b', '--balance_samples', action='store_true', help='Enable sample balancing to discard runs '
-                                                                         'if there is too big of an imbalance between '
-                                                                         'positive and negative edge counts.')
+parser.add_argument('-b', '--balance_samples', default=0, type=int, choices=[0, 1, 2, 3],
+                    help='Enable sample balancing to discard runs if there is too big of an imbalance between '
+                         'positive and negative edge counts.')
 parser.add_argument('-p', '--plot', action='store_true', help='Enable plotting the graphs produced during the tests.')
 parser.add_argument('--yolo_acc', action='store_true', help='Print YOLOv4 detection accuracy compared '
                                                             'to RICA\'s ground truth. Only has an effect '
@@ -65,7 +65,7 @@ parser.add_argument('--yolo_to_gt', action='store_true', help='When testing on Y
                                                               'to the GT detections.')
 
 args = parser.parse_args()
-logger.info('Running test with: -t="%s", -a="%s"' % (args.test, args.ablation))
+logging.info('Running test with: -t="%s", -a="%s"' % (args.test, args.ablation))
 
 # Point to where the SALSA cpp and ps folders are. Keep the structure SALSA provides.
 base_path_cpp = 'salsa/Annotation/salsa_cpp/'
@@ -96,7 +96,7 @@ elif args.test == 'cpp' or args.test == 'all_salsa':
     test_dict = {**remaining_dict, **frame_data_cpp}
     test_dict = frame_data_cpp
 if args.test in ['ps', 'cpp', 'all_salsa']:
-    logger.info('Train len: %d, Test len: %d' % (len(train_dict.keys()), len(test_dict.keys())))
+    logging.info('Train len: %d, Test len: %d' % (len(train_dict.keys()), len(test_dict.keys())))
 
 train_node_data = {}
 train_edge_data = {}
@@ -177,7 +177,7 @@ else:
                 pred_bbc = len(frame_data_rica[frame])
             det_accs.append(pred_bbc/len(gtbb))
             # print(frame, len(gtbb), len(frame_data_rica[frame]))
-        logger.info(str(np.average(det_accs)))
+        logging.info(str(np.average(det_accs)))
 
 test_node_data = {}
 test_edge_data = {}
@@ -327,7 +327,7 @@ for frame_id, val in train_edge_data.items():
     if draw_graph:
         nx_g = graph.to_networkx().to_undirected()
         # pos = nx.kamada_kawai_layout(nx_g)
-        logger.debug(pos)
+        logging.debug(pos)
         # should assign pos on -1:1 scale based on coordinates
         try:
             nx.draw(nx_g, pos, with_labels=True, node_color="#A0CBE2")
@@ -347,7 +347,7 @@ for frame_id, val in train_edge_data.items():
         plt.savefig(graph_path)
         plt.close()
     train_graphs.append(graph)
-logger.info('Skipped: %d' % skipped)
+logging.info('Skipped: %d' % skipped)
 
 skipped = 0
 iters_ps = 0
@@ -386,7 +386,7 @@ for frame_id, val in test_edge_data.items():
     if draw_graph:
         nx_g = graph.to_networkx().to_undirected()
         # pos = nx.kamada_kawai_layout(nx_g)
-        logger.debug(pos)
+        logging.debug(pos)
         # should assign pos on -1:1 scale based on coordinates
         try:
             nx.draw(nx_g, pos, with_labels=True, node_color="#A0CBE2")
@@ -407,7 +407,7 @@ for frame_id, val in test_edge_data.items():
         plt.close()
     test_graphs.append(graph)
     test_graph_frame_ids.append(frame_id)
-logger.info('Skipped: %d' % skipped)
+logging.info('Skipped: %d' % skipped)
 
 count = 0
 
@@ -424,48 +424,107 @@ pred = ut.MLPPredictor(h_feats)
 optimizer = torch.optim.Adam(itertools.chain(model.parameters(), pred.parameters()), lr=0.01)
 pos_edge_count = 0
 neg_edge_count = 0
-for single_train_graph in train_set:
-    u, v = single_train_graph.edges()
-    if args.ablation == 'edg':
-        train_pos_u, train_pos_v = u, v
-        train_pos_g = dgl.graph((train_pos_u, train_pos_v), num_nodes=single_train_graph.num_nodes())
-    else:
+if args.balance_samples != 2:
+    for single_train_graph in train_set:
+        u, v = single_train_graph.edges()
+        if args.ablation == 'edg':
+            train_pos_u, train_pos_v = u, v
+            train_pos_g = dgl.graph((train_pos_u, train_pos_v), num_nodes=single_train_graph.num_nodes())
+        else:
+            adj = sp.coo_matrix((np.ones(len(u)), (u.numpy(), v.numpy())))
+            try:
+                adj_neg = 1 - adj.todense() - np.eye(single_train_graph.num_nodes())
+            except ValueError:
+                continue
+            neg_u, neg_v = np.where(adj_neg != 0)
+            train_pos_u, train_pos_v = u, v
+            train_neg_u, train_neg_v = neg_u, neg_v
+            train_pos_g = dgl.graph((train_pos_u, train_pos_v), num_nodes=single_train_graph.num_nodes())
+            train_neg_g = dgl.graph((train_neg_u, train_neg_v), num_nodes=single_train_graph.num_nodes())
+            pos_edge_count += len(u)
+            neg_edge_count += len(neg_u)
+
+        for e in range(epochs):
+            # forward
+            # print('FEAT COUNT', len(batched_graph.ndata['feat']))
+            h = model(single_train_graph, single_train_graph.ndata['feat'])
+            pos_score = pred(train_pos_g, h)[0]['score']
+            if args.ablation == 'edg':
+                loss = ut.compute_loss_posonly(pos_score)
+            else:
+                neg_score = pred(train_neg_g, h)[0]['score']
+                loss = ut.compute_loss(pos_score, neg_score)
+
+            # backward
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+else:
+    train_pos_set = []
+    train_neg_set = []
+    for single_train_graph in train_set:
+        u, v = single_train_graph.edges()
         adj = sp.coo_matrix((np.ones(len(u)), (u.numpy(), v.numpy())))
         try:
             adj_neg = 1 - adj.todense() - np.eye(single_train_graph.num_nodes())
         except ValueError:
             continue
         neg_u, neg_v = np.where(adj_neg != 0)
-        train_pos_u, train_pos_v = u, v
-        train_neg_u, train_neg_v = neg_u, neg_v
-        train_pos_g = dgl.graph((train_pos_u, train_pos_v), num_nodes=single_train_graph.num_nodes())
-        train_neg_g = dgl.graph((train_neg_u, train_neg_v), num_nodes=single_train_graph.num_nodes())
+        train_pos_set.append([u, v])
+        train_neg_set.append([neg_u, neg_v])
         pos_edge_count += len(u)
         neg_edge_count += len(neg_u)
 
-    all_logits = []
+    index_samples = None
+    # if pos_edge_count < 23400 and (neg_edge_count-pos_edge_count) > 65500:
+    # if (neg_edge_count - pos_edge_count) > 65500:
+    #     exclude_sample_diff = (neg_edge_count-pos_edge_count)-65000
+    #     print('Need to discard: %d' % exclude_sample_diff)
+    #     discarded_count = 0
+    #     index_samples = []
+    #     while discarded_count < exclude_sample_diff:
+    #         sample_idx = random.sample(list(enumerate(train_neg_set)), 1)[0]
+    #         if sample_idx not in index_samples:
+    #             index_samples.append(sample_idx)
+    #             discarded_count += len(train_neg_set[sample_idx][0])
+    #     print('Downsampling negative set by %d samples' % len(index_samples))
 
-    for e in range(epochs):
-        # forward
-        # print('FEAT COUNT', len(batched_graph.ndata['feat']))
-        h = model(single_train_graph, single_train_graph.ndata['feat'])
-        pos_score = pred(train_pos_g, h)[0]['score']
-        if args.ablation == 'edg':
-            loss = ut.compute_loss_posonly(pos_score)
+    pos_edge_count = 0
+    neg_edge_count = 0
+    for idx in range(0, len(train_pos_set)):
+        if index_samples:
+            skip_neg = idx in index_samples
         else:
-            neg_score = pred(train_neg_g, h)[0]['score']
-            loss = ut.compute_loss(pos_score, neg_score)
+            skip_neg = False
+        train_pos_u, train_pos_v = train_pos_set[idx][0], train_pos_set[idx][1]
+        train_neg_u, train_neg_v = train_neg_set[idx][0], train_neg_set[idx][1]
 
-        # backward
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-logger.info('+ edge c %d' % pos_edge_count)
-logger.info('- edge c %d' % neg_edge_count)
+        train_pos_g = dgl.graph((train_pos_u, train_pos_v), num_nodes=single_train_graph.num_nodes())
+        train_neg_g = dgl.graph((train_neg_u, train_neg_v), num_nodes=single_train_graph.num_nodes())
+        pos_edge_count += len(train_pos_u)
+        if not skip_neg:
+            neg_edge_count += len(train_neg_u)
+        for e in range(epochs):
+            # print('Using skipneg: ', skip_neg)
+            # forward
+            # print('FEAT COUNT', len(batched_graph.ndata['feat']))
+            h = model(single_train_graph, single_train_graph.ndata['feat'])
+            pos_score = pred(train_pos_g, h)[0]['score']
+            if skip_neg:
+                loss = ut.compute_loss_posonly(pos_score)
+            else:
+                neg_score = pred(train_neg_g, h)[0]['score']
+                loss = ut.compute_loss(pos_score, neg_score)
+            # backward
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+logging.info('+ edge c %d' % pos_edge_count)
+logging.info('- edge c %d' % neg_edge_count)
 
 # Until a better method is found for balancing positive and negative feature data, if the sets are imbalanced,
 # discard the run.
-if args.balance_samples:
+if args.balance_samples == 1:
     if pos_edge_count < 23400 and (neg_edge_count-pos_edge_count) > 65500:  # can be separate
         exit()
 
@@ -474,7 +533,7 @@ auc_scores = []
 precision_scores = []
 recall_scores = []
 f1_scores = []
-logger.info('Starting tests %d' % len(test_set))
+logging.info('Starting tests %d' % len(test_set))
 test_c = 0
 for single_val_idx, single_val_graph in enumerate(test_set):
     test_c += 1
@@ -551,7 +610,7 @@ for single_val_idx, single_val_graph in enumerate(test_set):
                     # MISSES DUE TO YOLO NOT RECOGNISING PEOPLE
                     # ==================================================================================================
                         for rgt_key, rgt_val in frame_data_rica_gt.items():
-                            logger.debug('%s - %d' % (str(rgt_key), len(rgt_val)))
+                            logging.debug('%s - %d' % (str(rgt_key), len(rgt_val)))
                         rgt_node_count = len(frame_data_rica_gt[test_graph_frame_ids[single_val_idx]])
                         ryo_node_count = len(frame_data_rica[test_graph_frame_ids[single_val_idx]])
                         miss += rgt_node_count - ryo_node_count
@@ -613,7 +672,7 @@ for single_val_idx, single_val_graph in enumerate(test_set):
 
 if len(f1_scores) > 0:
     tracker_file_path = 'growl_param_analysis/%s_ablation_%s_test_%d_feats_%d_epochs_%d_balanced_model_f1output_%s.csv' % \
-                        (args.ablation, args.test, args.feats, args.epochs, int(args.balance_samples), args.string_end)
+                        (args.ablation, args.test, args.feats, args.epochs, args.balance_samples, args.string_end)
     model_output_tracker = pd.DataFrame(
         list(zip([datetime.datetime.now()], [h_feats], [epochs], [len(f1_scores)],
                  [np.mean(precision_scores)], [np.mean(recall_scores)], [np.mean(f1_scores)],
