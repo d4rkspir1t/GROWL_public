@@ -11,32 +11,40 @@ __maintainer__ = 'Viktor Schmuck'
 __email__ = 'viktor.schmuck@kcl.ac.uk'
 __status__ = 'Development in Progress'
 
-from subprocess import Popen
+import logging
+from subprocess import Popen, STDOUT, PIPE
 import sys
 import time
 
 import pandas as pd
 
+logger = logging.getLogger()
+logger.setLevel('INFO')
+
+
+def log_subprocess_output(pipe):
+    for line in iter(pipe.readline, b''): # b'\n'-separated lines
+        logging.info('subprocess: %r', line)
+
+
 filename = 'growl_test_code.py'
 feats = 20
 epochs = 100
-balanced = '-b'
-if balanced == '-b':
-    balanced_bool = True
-else:
-    balanced_bool = False
-string_end = '20220118'
+balanced = 0
+string_end = '20220208_0'
 ablations = ['no', 'ori', 'edg']
 ablation = ablations[0]
 test_on_options = ['ps', 'cpp', 'all_salsa', 'rica', 'rica_yolo']
 test_on = test_on_options[0]
 test_iters = 30
 tracker_file_path = 'growl_param_analysis/%s_ablation_%s_test_%d_feats_%d_epochs_%d_balanced_model_f1output_%s.csv' % \
-                        (ablation, test_on, feats, epochs, int(balanced_bool), string_end)
+                        (ablation, test_on, feats, epochs, balanced, string_end)
 while True:
     print("\nStarting " + filename)
-    func_call = 'python %s -f %d -e %d -s %s -t %s -a %s %s' % (filename, feats, epochs, string_end, test_on, ablation, balanced)
-    p = Popen(func_call, shell=True)
+    func_call = 'python %s -f %d -e %d -s %s -t %s -a %s -b %d' % (filename, feats, epochs, string_end, test_on, ablation, balanced)
+    p = Popen(func_call, shell=True, stdout=PIPE, stderr=STDOUT)
+    with p.stdout:
+        log_subprocess_output(p.stdout)
     p.wait()
     time.sleep(60)
 
