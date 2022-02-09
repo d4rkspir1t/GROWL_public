@@ -525,7 +525,7 @@ logging.info('- edge c %d' % neg_edge_count)
 # Until a better method is found for balancing positive and negative feature data, if the sets are imbalanced,
 # discard the run.
 if args.balance_samples == 1:
-    if pos_edge_count < 23400 and (neg_edge_count-pos_edge_count) > 65500:  # can be separate
+    if pos_edge_count < 23500 and (neg_edge_count-pos_edge_count) > 65500:  # can be separate
         exit()
 
 # TEST
