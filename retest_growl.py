@@ -30,8 +30,8 @@ def log_subprocess_output(pipe):
 filename = 'growl_test_code.py'
 feats = 20
 epochs = 100
-balanced = 2
-string_end = '20220209_b1'
+balanced = 1
+string_end = '20220209_1'
 ablations = ['no', 'ori', 'edg']
 ablation = ablations[0]
 test_on_options = ['ps', 'cpp', 'all_salsa', 'rica', 'rica_yolo']
