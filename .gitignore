@@ -4,4 +4,4 @@ yolo_db_orientation_20210810_cd_1.csv
 /salsa
 */__pycache__
 .pyc
-.csv
+*.csv
