@@ -476,16 +476,19 @@ else:
         neg_edge_count += len(neg_u)
 
     index_samples = None
+    target_diff = 65000
     # if pos_edge_count < 23400 and (neg_edge_count-pos_edge_count) > 65500:
-    if (neg_edge_count - pos_edge_count) > 65500:
-        exclude_sample_diff = (neg_edge_count-pos_edge_count)-65000
+    if (neg_edge_count - pos_edge_count) > target_diff:
+        exclude_sample_diff = (neg_edge_count-pos_edge_count)-target_diff
         print('Need to discard: %d' % exclude_sample_diff)
         discarded_count = 0
         index_samples = []
         while discarded_count < exclude_sample_diff:
-            sample_idx = random.sample(list(enumerate(train_neg_set)), 1)[0]
+            sample_idx = random.sample(list(enumerate(train_neg_set)), 1)[0][0]
+            # print('SAMPLE IDX', sample_idx)
             if sample_idx not in index_samples:
                 index_samples.append(sample_idx)
+                # print('TRAIN NEG SET ',train_neg_set[sample_idx])
                 discarded_count += len(train_neg_set[sample_idx][0])
         print('Downsampling negative set by %d samples' % len(index_samples))
 
