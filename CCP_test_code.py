@@ -463,7 +463,7 @@ else:
         neg_edge_count += len(neg_u)
 
     index_samples = None
-    target_diff = 65000
+    target_diff = 25000
     # if pos_edge_count < 23400 and (neg_edge_count-pos_edge_count) > 65500:
     if (neg_edge_count - pos_edge_count) > target_diff:
         exclude_sample_diff = (neg_edge_count-pos_edge_count)-target_diff

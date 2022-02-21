@@ -27,15 +27,15 @@ def log_subprocess_output(pipe):
         logging.info('subprocess: %r', line)
 
 
-filename = 'growl_test_code.py'
+filename = 'growl_ensemble_test.py'
 feats = 20
 epochs = 100
 balanced = 3
-string_end = '20220217_balance_3_try_0_SPS'
+string_end = '20220221_balance_3_try_0_SPS_2folds'
 ablations = ['no', 'ori', 'edg']
 ablation = ablations[0]
 test_on_options = ['ps', 'cpp', 'all_salsa', 'rica', 'rica_yolo']
-test_on = test_on_options[1]
+test_on = test_on_options[3]
 test_iters = 30
 tracker_file_path = 'growl_param_analysis/%s_ablation_%s_test_%d_feats_%d_epochs_%d_balanced_model_f1output_%s.csv' % \
                         (ablation, test_on, feats, epochs, balanced, string_end)
