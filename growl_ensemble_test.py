@@ -419,7 +419,7 @@ epochs = 100
 
 random_graph = random.sample(train_set, 1)[0]
 
-fold_count = 2
+fold_count = 3
 models = []
 done_models = []
 # print(random_graph)
