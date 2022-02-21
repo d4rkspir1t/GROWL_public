@@ -27,11 +27,11 @@ def log_subprocess_output(pipe):
         logging.info('subprocess: %r', line)
 
 
-filename = 'CCP_test_code.py'
+filename = 'growl_test_code.py'
 feats = 20
 epochs = 100
-balanced = 0
-string_end = '20220215_balance_0_try_1_CCP'
+balanced = 3
+string_end = '20220217_balance_3_try_0_SPS'
 ablations = ['no', 'ori', 'edg']
 ablation = ablations[0]
 test_on_options = ['ps', 'cpp', 'all_salsa', 'rica', 'rica_yolo']
